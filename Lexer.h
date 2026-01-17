@@ -10,12 +10,13 @@
 #include <ostream>
 
 enum class TokenType {
-    Define,
-    Assign,
-    EndOfAssign,
+    Define, Assign, EndOfAssign,
+    If, Else, ElseIf,
+    True, False, None,
+    For, While, Break,
+    Import, ImportAll,
     BinaryOperator,
-    LeftParen,
-    RightParen,
+    LeftParen, RightParen,
     Identifier,
     Number,
     Unknown

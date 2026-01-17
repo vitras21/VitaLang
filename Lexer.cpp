@@ -11,7 +11,12 @@
 const std::unordered_map<std::string, TokenType> keywords = {
     {"I would love to own a plot of land in the 1800s called", TokenType::Define},
     {"and lease it to", TokenType::Assign},
-    {"owners", TokenType::EndOfAssign}
+    {"owners", TokenType::EndOfAssign},
+    {"not particularly", TokenType::True},
+    {"not not particularly", TokenType::False},
+    {"context", TokenType::None},
+    {"scammy", TokenType::Import},
+    {"American", TokenType::ImportAll}
 };
 
 bool isspace(char c) {return (strchr(" \t\n", c));};
