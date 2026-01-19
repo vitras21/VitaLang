@@ -19,7 +19,8 @@ enum class TokenType {
     LeftParen, RightParen,
     Identifier,
     Number,
-    Unknown
+    Unknown,
+    Indent, Dedent, Newline, LeftCurly, RightCurly
 };
 
 class Token {

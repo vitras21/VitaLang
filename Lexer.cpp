@@ -16,12 +16,22 @@ const std::unordered_map<std::string, TokenType> keywords = {
     {"not not particularly", TokenType::False},
     {"context", TokenType::None},
     {"scammy", TokenType::Import},
-    {"American", TokenType::ImportAll}
+    {"American", TokenType::ImportAll},
+    {"sweet", TokenType::If},
+    {"stout", TokenType::Else},
+    {"sweet but stout", TokenType::ElseIf},
+    {"lolsie", TokenType::For}
 };
 
-bool isspace(char c) {return (strchr(" \t\n", c));};
-bool isdigit(char c) {return (strchr("0123456789", c));};
-bool isalpha(char c) {return (std::isalpha(c));};
+bool is_digit(const char c) {
+    return c >= '0' && c <= '9';
+}
+
+bool is_alpha(const char c) {
+    return (c >= 'a' && c <= 'z') ||
+           (c >= 'A' && c <= 'Z') ||
+           c == '_';
+}
 
 Token::Token(std::string value, TokenType type)
     : value(std::move(value)), type(type) {}
@@ -29,16 +39,63 @@ Token::Token(std::string value, TokenType type)
 std::vector<Token> tokenize(const std::string& src) {
     std::vector<Token> tokens;
     size_t i = 0;
+    std::vector<int> indentStack;
+    indentStack.push_back(0);
 
     while (i < src.length()) {
 
-        if (isspace(src[i])) {
+        if (src[i] == '\n') {
+            tokens.emplace_back("\\n", TokenType::Newline);
             i++;
+
+            int indent = 0;
+            while (i < src.length()) {
+                if (src[i] == ' ') {
+                    indent++;
+                } else if (src[i] == '\t') {
+                    indent += 4;
+                } else {
+                    break;
+                }
+                i++;
+            }
+
+            int currentIndent = indentStack.back();
+
+            if (indent > currentIndent) {
+                indentStack.push_back(indent);
+                tokens.emplace_back("INDENT", TokenType::Indent);
+            }
+            else if (indent < currentIndent) {
+                while (indent < indentStack.back()) {
+                    indentStack.pop_back();
+                    tokens.emplace_back("DEDENT", TokenType::Dedent);
+                }
+            }
+
             continue;
         }
 
         if (src[i] == '(') {
             tokens.emplace_back("(", TokenType::LeftParen);
+            i++;
+            continue;
+        }
+
+        if (src[i] == ')') {
+            tokens.emplace_back(")", TokenType::RightParen);
+            i++;
+            continue;
+        }
+
+        if (src[i] == '{') {
+            tokens.emplace_back("{", TokenType::LeftCurly);
+            i++;
+            continue;
+        }
+
+        if (src[i] == '}') {
+            tokens.emplace_back("}", TokenType::RightCurly);
             i++;
             continue;
         }
@@ -51,9 +108,15 @@ std::vector<Token> tokenize(const std::string& src) {
 
         bool matched = false;
         for (auto& [key, type] : keywords) {
-            if (src.compare(i, key.length(), key) == 0) {
-                tokens.emplace_back(key, type);
+            if (src.compare(i, key.length(), key) == 0 && (i + key.length() == src.length() || (!is_alpha(src[i + key.length()] && type != TokenType::For)))) {
                 i += key.length();
+                if (type == TokenType::For) {
+                    int n = 0;
+                    while (i < src.length() && src[i] == std::string("s")[0]) {n++; i++;}
+                    tokens.emplace_back(std::to_string(n), type);
+                } else {
+                    tokens.emplace_back(key, type);
+                }
                 matched = true;
                 break;
             }
@@ -61,9 +124,9 @@ std::vector<Token> tokenize(const std::string& src) {
 
         if (matched) continue;
 
-        if (isalpha(src[i])) {
+        if (is_alpha(src[i])) {
             size_t start = i;
-            while (isalnum(src[i])) i++;
+            while (i < src.length() && isalnum(src[i])) i++;
             tokens.emplace_back(
                 src.substr(start, i - start),
                 TokenType::Identifier
@@ -71,9 +134,9 @@ std::vector<Token> tokenize(const std::string& src) {
             continue;
         }
 
-        if (isdigit(src[i])) {
+        if (is_digit(src[i])) {
             size_t start = i;
-            while (isdigit(src[i])) i++;
+            while (i < src.length() && is_digit(src[i])) i++;
             tokens.emplace_back(
                 src.substr(start, i - start),
                 TokenType::Number
@@ -83,6 +146,11 @@ std::vector<Token> tokenize(const std::string& src) {
 
         tokens.emplace_back(std::string(1, src[i]), TokenType::Unknown);
         i++;
+    }
+
+    while (indentStack.size() > 1) {
+        indentStack.pop_back();
+        tokens.emplace_back("DEDENT", TokenType::Dedent);
     }
 
     return tokens;
