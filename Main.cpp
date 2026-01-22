@@ -37,10 +37,10 @@ int main(int argc, char** argv) {
     std::vector<Token> tokens = tokenize(script);
 
     for (const auto& token : tokens) {
-        std::cout << token << std::endl;
+        std::cout << to_string(token.type) << std::endl;
     }
 
-//    std::vector<ASTNode> AST = parse(tokens);
+    std::vector<std::unique_ptr<ASTNode>> AST = parse(tokens);
 
     return 0;
 };

@@ -76,6 +76,11 @@ std::vector<Token> tokenize(const std::string& src) {
             continue;
         }
 
+        if (src[i] == ' ' || src[i] == '\t' || src[i] == '\r') {
+            i++;
+            continue;
+        }
+
         if (src[i] == '(') {
             tokens.emplace_back("(", TokenType::LeftParen);
             i++;
