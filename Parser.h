@@ -34,6 +34,12 @@ struct Statement : ASTNode {
     virtual ~Statement() = default;
 };
 
+struct ArrayExpression final : Expression {
+    std::vector<std::unique_ptr<Expression>> elements;
+
+    explicit ArrayExpression(std::vector<std::unique_ptr<Expression>> elements) : elements(std::move(elements)) {}
+};
+
 struct LiteralExpression final : Expression {
     Token value;
 

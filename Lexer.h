@@ -17,8 +17,8 @@ enum class TokenType {
     Import, ImportAll,
     BinaryOperator,
     LeftParen, RightParen,
-    Identifier,
-    Number,
+    Variable, Const, String,
+    Number, Comma,
     Unknown,
     Indent, Dedent, Newline, LeftCurly, RightCurly
 };
@@ -42,8 +42,11 @@ inline std::string to_string(TokenType t) {
         case TokenType::BinaryOperator: return "BinaryOperator";
         case TokenType::LeftParen:      return "LeftParen";
         case TokenType::RightParen:     return "RightParen";
-        case TokenType::Identifier:     return "Identifier";
+        case TokenType::Variable:     return "Variable";
+        case TokenType::Const:          return "Const";
+        case TokenType::String:         return "String";
         case TokenType::Number:         return "Number";
+        case TokenType::Comma:          return "Comma";
         case TokenType::Unknown:        return "Unknown";
         case TokenType::Indent:         return "Indent";
         case TokenType::Dedent:         return "Dedent";
@@ -67,7 +70,7 @@ inline std::ostream& operator<<(std::ostream& os, const Token& token) {
     return os;
 }
 
-extern const std::unordered_map<std::string, TokenType> keywords;
+extern const std::vector<std::pair<std::string, TokenType>> keywords;
 
 bool isspace(char c);
 bool isdigit(char c);

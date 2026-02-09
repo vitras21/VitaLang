@@ -7,17 +7,16 @@
 
 #include <memory>
 
-size_t i = 0;
-
-void expect(const Token& token, TokenType type) {
-    if (token.type != type) {
-        throw Context("Expected token of type" + to_string(type) + ", got " + to_string(token.type));
+template<typename... Types>
+void expect(const Token& token, Types... types) {
+    if (!((token.type == types) || ...)) {
+        throw Context("Unexpected token of type" + to_string(token.type) + ": " + token.value);
     }
 }
 
 std::unique_ptr<Expression> parsePrimary(const std::vector<Token>& tokens, size_t& i) {
     if (tokens[i].type == TokenType::Number ||
-        tokens[i].type == TokenType::Identifier) {
+        tokens[i].type == TokenType::Variable || tokens[i].type == TokenType::String || tokens[i].type == TokenType::Const) {
         return std::make_unique<LiteralExpression>(tokens[i++]);
         }
 
@@ -56,13 +55,25 @@ std::unique_ptr<Expression> parseExpression(
     return left;
 };
 
-std::unique_ptr<ForStatement> parseFor(const std::vector<Token>& tokens) {
+std::unique_ptr<Expression> parseArray(const std::vector<Token>& tokens, size_t& i) {
+    std::vector<std::unique_ptr<Expression>> elements;
+    elements.push_back(parseExpression(tokens, i));
+
+    while (i < tokens.size() && tokens[i].type == TokenType::Comma) {
+        i++;
+        elements.push_back(parseExpression(tokens, i));
+    }
+
+    return std::make_unique<ArrayExpression>(std::move(elements));
+}
+
+std::unique_ptr<ForStatement> parseFor(const std::vector<Token>& tokens, size_t& i) {
     expect(tokens[i], TokenType::For);
     const size_t n = std::stoul(tokens[i].value);
     i++;
 
 
-    expect(tokens[i], TokenType::Identifier);
+    expect(tokens[i], TokenType::Variable);
     Token id = tokens[i];
     i++;
 
@@ -71,7 +82,7 @@ std::unique_ptr<ForStatement> parseFor(const std::vector<Token>& tokens) {
     return std::make_unique<ForStatement>(n, std::move(id), std::move(body));
 }
 
-std::unique_ptr<IfStatement> parseIf(const std::vector<Token>& tokens) {
+std::unique_ptr<IfStatement> parseIf(const std::vector<Token>& tokens, size_t& i) {
     expect(tokens[i], TokenType::If);
     i++;
 
@@ -91,7 +102,7 @@ std::unique_ptr<IfStatement> parseIf(const std::vector<Token>& tokens) {
     );
 }
 
-std::unique_ptr<WhileStatement> parseWhile(const std::vector<Token>& tokens) {
+std::unique_ptr<WhileStatement> parseWhile(const std::vector<Token>& tokens, size_t& i) {
     expect(tokens[i], TokenType::LeftParen);
     i++;
 
@@ -118,11 +129,11 @@ std::unique_ptr<WhileStatement> parseWhile(const std::vector<Token>& tokens) {
     );
 }
 
-std::unique_ptr<Assignment> parseAssignment(const std::vector<Token>& tokens) {
+std::unique_ptr<Assignment> parseAssignment(const std::vector<Token>& tokens, size_t& i) {
     expect(tokens[i], TokenType::Define);
     i++;
 
-    expect(tokens[i], TokenType::Identifier);
+    expect(tokens[i], TokenType::Const, TokenType::Variable);
     Token id = tokens[i];
     i++;
 
@@ -147,14 +158,14 @@ std::unique_ptr<Assignment> parseAssignment(const std::vector<Token>& tokens) {
     );
 }
 
-std::unique_ptr<Statement> parseStatement(const std::vector<Token>& tokens) {
+std::unique_ptr<Statement> parseStatement(const std::vector<Token>& tokens, size_t& i) {
 
     if (tokens[i].type == TokenType::For) {
-        return parseFor(tokens);
+        return parseFor(tokens, i);
     }
 
     if (tokens[i].type == TokenType::If) {
-        return parseIf(tokens);
+        return parseIf(tokens, i);
     }
 
     if (tokens[i].type == TokenType::LeftParen) {
@@ -163,18 +174,18 @@ std::unique_ptr<Statement> parseStatement(const std::vector<Token>& tokens) {
             j++;
         }
         if (tokens[j + 1].type == TokenType::While) {
-            return parseWhile(tokens);
+            return parseWhile(tokens, i);
         }
     }
 
     if (tokens[i].type == TokenType::Define) {
-        return parseAssignment(tokens);
+        return parseAssignment(tokens, i);
     }
 
     throw Context("Unrecognized token of type: " + to_string(tokens[i].type) + "with value: " + tokens[i].value);
 }
 
-std::vector<std::unique_ptr<ASTNode>> parseBlock(const std::vector<Token>& tokens) {
+std::vector<std::unique_ptr<ASTNode>> parseBlock(const std::vector<Token>& tokens, size_t& i) {
     expect(tokens[i], TokenType::LeftCurly);
     i++;
 
@@ -204,6 +215,7 @@ std::vector<std::unique_ptr<ASTNode>> parseBlock(const std::vector<Token>& token
 }
 
 std::vector<std::unique_ptr<ASTNode>> parse(const std::vector<Token>& tokens) {
+    size_t i = 0;
     std::vector<std::unique_ptr<ASTNode>> program;
 
     while (i < tokens.size()) {

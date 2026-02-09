@@ -8,18 +8,18 @@
 #include <vector>
 #include <cstring>
 
-const std::unordered_map<std::string, TokenType> keywords = {
+const std::vector<std::pair<std::string, TokenType>> keywords = {
     {"I would love to own a plot of land in the 1800s called", TokenType::Define},
-    {"and lease it to", TokenType::Assign},
-    {"owners", TokenType::EndOfAssign},
-    {"not particularly", TokenType::True},
     {"not not particularly", TokenType::False},
-    {"context", TokenType::None},
-    {"scammy", TokenType::Import},
+    {"not particularly", TokenType::True},
+    {"and lease it to", TokenType::Assign},
+    {"sweet but stout", TokenType::ElseIf},
     {"American", TokenType::ImportAll},
+    {"context", TokenType::None},
+    {"owners", TokenType::EndOfAssign},
+    {"scammy", TokenType::Import},
     {"sweet", TokenType::If},
     {"stout", TokenType::Else},
-    {"sweet but stout", TokenType::ElseIf},
     {"lolsie", TokenType::For}
 };
 
@@ -45,7 +45,7 @@ std::vector<Token> tokenize(const std::string& src) {
     while (i < src.length()) {
 
         if (src[i] == '\n') {
-            tokens.emplace_back("\\n", TokenType::Newline);
+            tokens.emplace_back("\n", TokenType::Newline);
             i++;
 
             int indent = 0;
@@ -113,7 +113,8 @@ std::vector<Token> tokenize(const std::string& src) {
 
         bool matched = false;
         for (auto& [key, type] : keywords) {
-            if (src.compare(i, key.length(), key) == 0 && (i + key.length() == src.length() || (!is_alpha(src[i + key.length()] && type != TokenType::For)))) {
+            if (src.compare(i, key.length(), key) == 0 && (i + key.length() == src.length() || (!is_alpha(src[i + key.length()]) || type == TokenType::For)))
+            {
                 i += key.length();
                 if (type == TokenType::For) {
                     int n = 0;
@@ -129,19 +130,42 @@ std::vector<Token> tokenize(const std::string& src) {
 
         if (matched) continue;
 
+        if (src[i] == ',') {
+            tokens.emplace_back(",", TokenType::Comma);
+            i++;
+            continue;
+        }
+
+        if (src[i] == '$') {
+            i++;
+            size_t start = i;
+            while (i < src.length() && is_alpha(src[i])) i++;
+            tokens.emplace_back(src.substr(start, i - start), TokenType::Const);
+            continue;
+        }
+
+        if (src[i] == char(163)) { // £
+            i++;
+            size_t start = i;
+            while (i < src.length() && is_alpha(src[i])) i++;
+            tokens.emplace_back(src.substr(start, i - start), TokenType::Variable);
+            continue;
+        }
+
         if (is_alpha(src[i])) {
             size_t start = i;
-            while (i < src.length() && isalnum(src[i])) i++;
-            tokens.emplace_back(
-                src.substr(start, i - start),
-                TokenType::Identifier
-            );
+            while (i < src.length() && is_alpha(src[i])) i++;
+            tokens.emplace_back(src.substr(start, i - start), TokenType::String);
             continue;
         }
 
         if (is_digit(src[i])) {
             size_t start = i;
-            while (i < src.length() && is_digit(src[i])) i++;
+            bool seenDot = false;
+            while (i < src.length() && (is_digit(src[i]) || (!seenDot && src[i] == '.'))) {
+                if (src[i] == '.') seenDot = true;
+                i++;
+            }
             tokens.emplace_back(
                 src.substr(start, i - start),
                 TokenType::Number
