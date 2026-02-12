@@ -34,7 +34,7 @@ static KEYWORDS: LazyLock<Vec<(&'static str, TokenType)>> = LazyLock::new(|| {
         ("stout", TokenType::Else),
         ("lolsie", TokenType::For),
         ("yarp'", TokenType::While),
-        ("jump of the bandwagon", TokenType::Break),
+        ("jump off the bandwagon", TokenType::Break),
         ("get back to work boy", TokenType::Continue),
         ("anywho", TokenType::Yield),
         ("sir, would there happen to be any extension work?", TokenType::Try),

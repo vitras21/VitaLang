@@ -16,7 +16,7 @@
       "patterns": [
         {
           "name": "keyword.control.vitalang",
-          "match": "(sweet but stout|I would love to own a plot of land in the 1800s called|and lease it to|jump of the bandwagon|get back to work boy|sir, would there happen to be any extension work\\?|yay, homework!|sweet|stout|American|owners|scammy|lolsies*|yarp')"
+          "match": "(sweet but stout|I would love to own a plot of land in the 1800s called|and lease it to|jump off the bandwagon|get back to work boy|sir, would there happen to be any extension work\\?|yay, homework!|sweet|stout|American|owners|scammy|lolsies*|yarp')"
         }
       ]
     },

@@ -1,4 +1,14 @@
 .vscode/**
 .vscode-test/**
+.git/**
 .gitignore
+.github/**
+node_modules/**
+src/**
+**/*.map
+**/*.ts
+tsconfig.json
 vsc-extension-quickstart.md
+.vscodeignore
+webpack.config.js
+package-lock.json

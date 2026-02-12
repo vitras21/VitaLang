@@ -2,24 +2,54 @@
   "name": "vitalang",
   "displayName": "VitaLang",
   "description": "",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.109.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:vitalang"
+  ],
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p ."
   },
   "categories": [
     "Programming Languages"
   ],
   "contributes": {
-    "languages": [{
-      "id": "vitalang",
-      "aliases": ["VitaLang", "vitalang"],
-      "extensions": [".vit"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "vitalang",
-      "scopeName": "source.vitalang",
-      "path": "./syntaxes/vitalang.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "vitalang",
+        "aliases": [
+          "VitaLang",
+          "vitalang"
+        ],
+        "extensions": [
+          ".vit"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "vitalang",
+        "scopeName": "source.vitalang",
+        "path": "./syntaxes/vitalang.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[vitalang]": {
+        "editor.wordBasedSuggestions": false
+      }
+    }
+  },
+  "devDependencies": {
+    "vscode": "^1.109.0"
+  },
+  "dependencies": {
+    "generator-code": "^1.11.17",
+    "typescript": "^5.9.3",
+    "yo": "^6.0.0"
   }
 }

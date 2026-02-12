@@ -40,10 +40,13 @@
 # debug information files
 *.dwo
 
+<<<<<<< Updated upstream
 
 extensions/vscode/.vscode/*
 extensions/vscode/node_modules/*
 extensions/vscode/out/*
 extensions/vscode/*.vsix
 
+=======
+>>>>>>> Stashed changes
 VitaLang
