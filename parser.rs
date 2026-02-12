@@ -1,8 +1,10 @@
 use crate::lexer;
+use std::collections::HashMap;
 
 const POSTFIX: &[&str] = &["!", "?", "+", "-"];
 const PREFIX: &[&str] = &["!", "?"];
 
+#[derive(Debug)]
 pub enum Expr {
     String(String),
     Variable(String),
@@ -48,38 +50,40 @@ pub enum Expr {
         val: Box<Expr>,
     },
 
+    Try {
+        attempt: Box<Expr>,
+        catch: Box<Expr>
+    },
+
+    Yield(Box<Expr>),
+
+    Break(),
+
     Block(Vec<Expr>)
 }
 
+pub struct Parser<'a> {
+    tokens: Vec<lexer::Token>,
+    pos: usize,
+    precedence_map: HashMap<&'a str, usize>,
+}
 
-fn precedence(token: &lexer::Token) -> usize {
-    let v = &token.value;
+impl<'a> Parser<'a> {
+    pub fn new(tokens: Vec<lexer::Token>, pos: usize, precedence_map: HashMap<&'a str, usize>) -> Self {
+        Self { tokens, pos, precedence_map }
+    }
 
-    match v {
-        Some(lexer::TokenValue::Str(s)) => match s.as_str() {
-            "^^" => return 4,   // Tetration
-            "^" => return 3,    // Exponention
-            "*" | "/" => return 2,  // Multiplication/Division
-            "+" | "-" => return 1,  // Addition/Subtraction
-            ">" | "<" | "=" | "≥" | "≤" => return 0,    // Comparisons
+    fn precedence(&self, token: &lexer::Token) -> usize {
+        let v = &token.value;
+
+        match v {
+            Some(lexer::TokenValue::Str(s)) =>  return *self.precedence_map.get(s.as_str()).unwrap(),
             _ => crate::fail()
         }
-        _ => crate::fail()
-    }
-}
-
-pub struct Parser {
-    tokens: Vec<lexer::Token>,
-    pos: usize
-}
-
-impl Parser {
-    pub fn new(tokens: Vec<lexer::Token>, pos: usize) -> Self {
-        Self { tokens, pos }
     }
 
     fn peek(&self) -> Option<&lexer::Token> {
-        return self.tokens.get(self.pos)
+        self.tokens.get(self.pos)
     }
 
     fn advance(&mut self) -> Option<lexer::Token> {
@@ -89,93 +93,74 @@ impl Parser {
     }
 
     fn expect(&mut self, types: &[lexer::TokenType]) -> lexer::Token {
-        let token = match self.advance() {
-            Some(t) => t,
-            None => crate::fail()
-        };
+        let token = match self.advance(){ Some(t) => t, None => crate::fail(), };
         if !types.iter().any(|t| *t == token._type) {
             crate::fail();
         }
-        return token;
+        token
     }
 
-    fn parse_primary(&mut self) -> Expr {
-        match self.advance() {
-            Some(lexer::Token {_type: lexer::TokenType::Const, value: Some(lexer::TokenValue::Str(s))}) => return Expr::Const(s.clone()),
-            Some(lexer::Token {_type: lexer::TokenType::Variable, value: Some(lexer::TokenValue::Str(s))}) => return Expr::Variable(s.clone()),
-            Some(lexer::Token {_type: lexer::TokenType::String, value: Some(lexer::TokenValue::Str(s))}) => {
-                if self.peek().is_some() && self.peek().unwrap()._type == lexer::TokenType::LeftParen {
-                    let mut args = Vec::<Expr>::new();
-                    self.expect(&[lexer::TokenType::LeftParen]);
-                    while let Some(token) = self.peek() {
-                        if token._type == lexer::TokenType::RightParen {
-                            break;
-                        }
-                        args.push(self.parse_primary());
-                    }
-                    self.expect(&[lexer::TokenType::RightParen]);
-                    return Expr::Func { name: s.clone(), args };
-                } else {
-                    return Expr::String(s.clone());
-                }
-            },
-            Some(lexer::Token {_type: lexer::TokenType::Define, .. }) => {
-                let var = match self.expect(&[lexer::TokenType::Const, lexer::TokenType::Variable]).value {
-                    Some(lexer::TokenValue::Str(s)) => s.clone(),
-                    _ => crate::fail()
-                };
+    pub fn parse(&mut self) -> Expr {
+        // eprintln!("[DEBUG] Starting parse with {} tokens", self.tokens.len());
+        let mut exprs = Vec::new();
 
-                self.expect(&[lexer::TokenType::Assign]);
-                let val = self.parse_primary();
-                self.expect(&[lexer::TokenType::EndOfAssign]);
-                return Expr::Define { var, val: Box::new(val)};
-            },
-            Some(lexer::Token {_type: lexer::TokenType::LeftParen, .. }) => {
-                let expr = self.parse_expr();
-                self.expect(&[lexer::TokenType::RightParen]);
-                return expr;
-            },
-            Some(lexer::Token {_type: lexer::TokenType::If, .. }) => {
-                return self.parse_if()
-            },
-            Some(lexer::Token {_type: lexer::TokenType::For, .. }) => {
-                return self.parse_for()
-            },
-            _ => crate::fail()
+        while let Some(token) = self.peek() {
+            match token._type {
+                lexer::TokenType::EOF => break,
+
+                lexer::TokenType::Newline => {
+                    self.advance();
+                }
+
+                lexer::TokenType::Indent | lexer::TokenType::Dedent => {
+                    crate::fail();
+                }
+
+                _ => exprs.push(self.parse_expr()),
+            }
         }
+
+        // eprintln!("[DEBUG] Parse complete, {} expressions", exprs.len());
+        Expr::Block(exprs)
     }
 
     fn parse_expr(&mut self) -> Expr {
-        return self.parse_binary(0);
+        // eprintln!("[DEBUG] parse_expr with {}", self.tokens.get(self.pos).unwrap());
+        self.parse_binary(0)
     }
 
     fn parse_binary(&mut self, min_prec: usize) -> Expr {
+        // eprintln!("[DEBUG] parse_binary(min_prec={}) with {}", min_prec, self.tokens.get(self.pos).unwrap());
         let mut left = self.parse_prefix();
 
         while let Some(token) = self.peek() {
+            
             if token._type != lexer::TokenType::BinaryOperator {
+                // eprintln!("[DEBUG] Not a binary operator, breaking");
                 break;
             }
 
-            let prec = precedence(token);
+            let prec = self.precedence(token);
             if prec < min_prec {
+                // eprintln!("[DEBUG] Precedence {} < {}, breaking", prec, min_prec);
                 break;
             }
 
             let op_token = self.advance().unwrap();
+            // eprintln!("[DEBUG] Processing binary operator: {:?}", op_token);
             let right = self.parse_binary(prec + 1);
 
             left = Expr::Binary {
                 left: Box::new(left),
                 op: match &op_token.value {
                     Some(lexer::TokenValue::Str(s)) => s.clone(),
-                    _ => crate::fail()
+                    _ => crate::fail(),
                 },
                 right: Box::new(right),
             };
         }
 
-        return left;
+        left
     }
 
     fn parse_prefix(&mut self) -> Expr {
@@ -193,7 +178,7 @@ impl Parser {
             }
         }
 
-        return self.parse_postfix();
+        self.parse_postfix()
     }
 
     fn parse_postfix(&mut self) -> Expr {
@@ -206,9 +191,11 @@ impl Parser {
             };
 
             match token._type {
-                _ if matches!(token.value, Some(lexer::TokenValue::Char(c))
-                    if POSTFIX.contains(&c.to_string().as_str())) =>
-                {
+                _ if matches!(
+                    token.value,
+                    Some(lexer::TokenValue::Char(c))
+                        if POSTFIX.contains(&c.to_string().as_str())
+                ) => {
                     let op = match &token.value {
                         Some(lexer::TokenValue::Char(c)) => c.to_string(),
                         _ => unreachable!(),
@@ -222,15 +209,11 @@ impl Parser {
 
                 lexer::TokenType::While => {
                     self.advance();
-
-                    let then_branch = self.parse_expr();
-                    self.expect(&[lexer::TokenType::Else]);
-                    let else_branch = self.parse_expr();
-
+                    let body = self.parse_block();
                     expr = Expr::While {
                         cond: Box::new(expr),
-                        then: Box::new(then_branch),
-                        else_then: Box::new(else_branch),
+                        then: Box::new(body),
+                        else_then: Box::new(Expr::Block(vec![])),
                     };
                 }
 
@@ -238,15 +221,193 @@ impl Parser {
             }
         }
 
-        return expr
+        expr
+    }
+
+    fn parse_primary(&mut self) -> Expr {
+        // eprintln!("[DEBUG] parse_primary with {}", self.tokens.get(self.pos).unwrap());
+        match self.advance() {
+            Some(lexer::Token {
+                _type: lexer::TokenType::Const,
+                value: Some(lexer::TokenValue::Str(s)),
+            }) => {
+                // eprintln!("[DEBUG] Parsed constant: {}", s);
+                Expr::Const(s)
+            },
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::Variable,
+                value: Some(lexer::TokenValue::Str(s)),
+            }) => {
+                // eprintln!("[DEBUG] Parsed variable: {}", s);
+                Expr::Variable(s)
+            },
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::String,
+                value: Some(lexer::TokenValue::Str(s)),
+            }) => {
+                match self.peek() {
+                    Some(lexer::Token {_type: lexer::TokenType::LeftParen, ..}) => {
+                        self.advance();
+                        let mut args = Vec::new();
+                        
+                        while let Some(token) = self.peek() {
+                            if token._type == lexer::TokenType::RightParen {
+                                break;
+                            }
+                            if token._type == lexer::TokenType::Comma {
+                                self.advance();
+                                continue;
+                            }
+                            args.push(self.parse_expr());
+                        }
+                        
+                        self.expect(&[lexer::TokenType::RightParen]);
+                        Expr::Func {
+                            name: s,
+                            args,
+                        }
+                    },
+                    _ => Expr::String(s)
+                }
+            },
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::If,
+                ..
+            }) => {
+                // eprintln!("[DEBUG] Parsing if expression");
+                self.parse_if()
+            },
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::For,
+                ..
+            }) => {
+                // eprintln!("[DEBUG] Parsing for expression");
+                self.parse_for()
+            },
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::Try,
+                ..
+            }) => {
+                // eprintln!("[DEBUG] Parsing try expression");
+                self.parse_try()
+            },
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::Yield,
+                ..
+            }) => {
+                // eprintln!("[DEBUG] Parsing yield expression");
+                self.parse_yield()
+            },
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::Break,
+                ..
+            }) => Expr::Break(),
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::LeftParen,
+                ..
+            }) => {
+                let expr = self.parse_expr();
+                self.expect(&[lexer::TokenType::RightParen]);
+                expr
+            }
+
+            Some(lexer::Token {
+                _type: lexer::TokenType::LeftCurly,
+                ..
+            }) => {
+                // eprintln!("[DEBUG] Parsing block");
+                self.parse_block()
+            },
+
+            Some(lexer::Token { _type: lexer::TokenType::Define, .. }) => {
+                let var_token = self.expect(&[lexer::TokenType::Variable, lexer::TokenType::Const]);
+                let var = match var_token.value {
+                    Some(lexer::TokenValue::Str(s)) => s,
+                    _ => crate::fail()
+                };
+                self.expect(&[lexer::TokenType::Assign]);
+
+                let val = self.parse_expr();
+                self.expect(&[lexer::TokenType::EndOfAssign]);
+                Expr::Define {var, val: Box::new(val) }
+            },
+
+            _ => crate::fail(),
+        }
+    }
+
+    fn parse_block(&mut self) -> Expr {
+        // eprintln!("[DEBUG] parse_block with {}", self.tokens.get(self.pos).unwrap());
+        if let Some(token) = self.peek() {
+            
+            if token._type == lexer::TokenType::RightCurly {
+                self.advance();
+                return Expr::Block(vec![]);
+            }
+            
+            if token._type != lexer::TokenType::Newline {
+                let expr = self.parse_expr();
+                self.expect(&[lexer::TokenType::RightCurly]);
+                return Expr::Block(vec![expr]);
+            }
+        }
+        self.expect(&[lexer::TokenType::Newline]);
+        self.expect(&[lexer::TokenType::Indent]);
+
+        let mut exprs = Vec::new();
+
+        while let Some(token) = self.peek() {
+            
+            if token._type == lexer::TokenType::Dedent {
+                
+                break;
+            }
+
+            if token._type == lexer::TokenType::Newline {
+                self.advance();
+                continue;
+            }
+
+            exprs.push(self.parse_expr());
+        }
+
+        self.expect(&[lexer::TokenType::Dedent]);
+
+        if matches!(self.peek(), Some(t) if t._type == lexer::TokenType::Newline) {
+            self.advance();
+        }
+
+        self.expect(&[lexer::TokenType::RightCurly]);
+
+        // eprintln!("[DEBUG] Block complete with {} expressions", exprs.len());
+        Expr::Block(exprs)
     }
 
     fn parse_if(&mut self) -> Expr {
+        // eprintln!("[DEBUG] parse_if with {}", self.tokens.get(self.pos).unwrap());
         let cond = self.parse_expr();
-        let then_branch = self.parse_expr();
+        self.expect(&[lexer::TokenType::LeftCurly]);
+        let then_branch = self.parse_block();
 
-        self.expect(&[lexer::TokenType::Else]);
-        let else_branch = self.parse_expr();
+        let else_branch = if let Some(token) = self.peek() {
+            if token._type == lexer::TokenType::Else {
+                self.advance();
+                self.expect(&[lexer::TokenType::LeftCurly]);
+                self.parse_block()
+            } else {
+                Expr::Block(vec![])
+            }
+        } else {
+            Expr::Block(vec![])
+        };
 
         Expr::If {
             cond: Box::new(cond),
@@ -256,51 +417,49 @@ impl Parser {
     }
 
     fn parse_for(&mut self) -> Expr {
+        // eprintln!("[DEBUG] parse_for with {}", self.tokens.get(self.pos).unwrap());
         let token = self.tokens.get(self.pos - 1).unwrap();
-
-        let iter = match &token.value {
-            Some(lexer::TokenValue::Str(s)) => {
-                s.parse::<usize>().unwrap_or_else(|_| crate::fail())
+        let iter = match &token.value {            Some(lexer::TokenValue::Num(n)) => *n,            Some(lexer::TokenValue::Str(s)) => {
+                
+                s.parse().unwrap_or_else(|_| crate::fail())
             }
-            _ => crate::fail()
+            _ => crate::fail(),
         };
 
-        let var_token = self.expect(&[lexer::TokenType::Variable]);
-
-        let var_name = match &var_token.value {
-            Some(lexer::TokenValue::Str(s)) => s.clone(),
-            _ => crate::fail()
+        let var = match self.expect(&[lexer::TokenType::Variable]).value {
+            Some(lexer::TokenValue::Str(s)) => {
+                
+                s
+            }
+            _ => crate::fail(),
         };
 
-        let then_branch = self.parse_expr();
-
-        self.expect(&[lexer::TokenType::Else]);
-        let else_branch = self.parse_expr();
+        self.expect(&[lexer::TokenType::LeftCurly]);
+        let body = self.parse_block();
 
         Expr::For {
             iter,
-            var: var_name,
-            then: Box::new(then_branch),
-            else_then: Box::new(else_branch),
+            var,
+            then: Box::new(body),
+            else_then: Box::new(Expr::Block(vec![])),
         }
     }
-}
 
+    fn parse_try(&mut self) -> Expr {
+        // eprintln!("[DEBUG] parse_try with {}", self.tokens.get(self.pos).unwrap());
+        let attempt = self.parse_expr();
+        self.expect(&[lexer::TokenType::Catch]);
+        let catch = self.parse_expr();
 
-
-
-impl Parser {
-    pub fn parse(&mut self) -> Expr {
-        let mut exprs = Vec::new();
-
-        while self.peek().is_some() {
-            if self.tokens.get(self.pos())._type == lexer::TokenType::Newline {
-                self.advance();
-                continue;
-            };
-            exprs.push(self.parse_expr());
+        Expr::Try {
+            attempt: Box::new(attempt),
+            catch: Box::new(catch),
         }
+    }
 
-        Expr::Block(exprs)
+    fn parse_yield(&mut self) -> Expr {
+        // eprintln!("[DEBUG] parse_yield with {}", self.tokens.get(self.pos).unwrap());
+        let expr = self.parse_expr();
+        Expr::Yield(Box::new(expr))
     }
 }

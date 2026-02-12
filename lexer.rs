@@ -9,7 +9,8 @@ pub enum TokenType {
     BinaryOperator,
     LeftParen, RightParen,
     Variable, Const, String, Comma,
-    Indent, Dedent, Newline, LeftCurly, RightCurly
+    Indent, Dedent, Newline, LeftCurly, RightCurly,
+    EOF, Continue, Yield, Try, Catch
 }
 
 use std::fmt;
@@ -30,7 +31,13 @@ static KEYWORDS: LazyLock<Vec<(&'static str, TokenType)>> = LazyLock::new(|| {
         ("scammy", TokenType::Import),
         ("sweet", TokenType::If),
         ("stout", TokenType::Else),
-        ("lolsie", TokenType::For)
+        ("lolsie", TokenType::For),
+        ("yarp'", TokenType::While),
+        ("jump of the bandwagon", TokenType::Break),
+        ("get back to work boy", TokenType::Continue),
+        ("anywho", TokenType::Yield),
+        ("sir, would there happen to be any extension work?", TokenType::Try),
+        ("yay, homework!", TokenType::Catch)
     ];
 
     v.sort_by_key(|(s, _): &(&str, TokenType)| std::cmp::Reverse(s.len()));
@@ -76,7 +83,7 @@ impl fmt::Display for Token {
     }
 }
 
-static operators: &[&str] = &["^", "*", "/", "+", "-", "<", ">", "=", "≥", "≤"];
+static OPERATORS: &[&str] = &["^", "*", "/", "+", "-", "<", ">", "=", "≥", "≤"];
 
 pub fn tokenize(src: &String) -> Vec<Token> {
     let mut tokens = Vec::<Token>::new();
@@ -87,7 +94,7 @@ pub fn tokenize(src: &String) -> Vec<Token> {
     while let Some(c) = chars.next() {
         match c {
             '\n' => {
-                tokens.push(Token::new(TokenType::Newline, Some(TokenValue::Char('\n'))));
+                tokens.push(Token::new(TokenType::Newline, Some(TokenValue::Str("\\n".to_string()))));
                 let mut indent = 0;
                 while let Some(&next_c) = chars.peek() {
                     match next_c {
@@ -118,10 +125,11 @@ pub fn tokenize(src: &String) -> Vec<Token> {
             '{' => tokens.push(Token::new(TokenType::LeftCurly, Some(TokenValue::Char('{')))),
             '}' => tokens.push(Token::new(TokenType::RightCurly, Some(TokenValue::Char('}')))),
             ',' => tokens.push(Token::new(TokenType::Comma, Some(TokenValue::Char(',')))),
-            op if operators.contains(&op.to_string().as_str()) => {
+            op if OPERATORS.contains(&op.to_string().as_str()) => {
                 let mut value = String::new();
+                value.push(op.to_string().chars().next().unwrap());
                 while let Some(&next_c) = chars.peek() {
-                    if operators.contains(&next_c.to_string().as_str()) {
+                    if OPERATORS.contains(&next_c.to_string().as_str()) {
                         value.push(next_c);
                         chars.next();
                     } else {
@@ -144,7 +152,7 @@ pub fn tokenize(src: &String) -> Vec<Token> {
                 tokens.push(Token::new(TokenType::Const, Some(TokenValue::Str(value))));
             }
 
-            '£' => {
+            '£' | '€' => {
                 let mut value = String::new();
                 while let Some(&next_c) = chars.peek() {
                     if next_c.is_ascii_alphanumeric() || next_c == '_' {
@@ -219,6 +227,8 @@ pub fn tokenize(src: &String) -> Vec<Token> {
             }
         }
     }
+
+    tokens.push(Token::new(TokenType::EOF, Some(TokenValue::Str("EOF".to_string()))));
 
     return tokens
 }

@@ -1,6 +1,7 @@
 use std::env;
 use std::fmt;
 use std::fs;
+use std::collections::HashMap;
 mod lexer;
 mod parser;
 
@@ -27,6 +28,14 @@ pub fn fail() -> ! {
 impl std::error::Error for Context {}
 
 fn main() {
+    let mut precedence_map: HashMap<&'static str, usize> = HashMap::new();
+
+    precedence_map.insert("^^", 4);
+    precedence_map.insert("^", 3);
+    precedence_map.insert("*", 2); precedence_map.insert("/", 2);
+    precedence_map.insert("+", 1); precedence_map.insert("-", 1);
+    precedence_map.insert("<", 0); precedence_map.insert(">", 0); precedence_map.insert("=", 0); precedence_map.insert("≥", 0); precedence_map.insert("≤", 0);
+
     let args: Vec<String> = env::args().collect();
 
     let script_name = &args[1];
@@ -35,9 +44,10 @@ fn main() {
 
     let tokens = lexer::tokenize(&script.unwrap());
 
-    for token in &tokens {
-        println!("{}", token);
-    }
+    // for token in &tokens {
+    //     println!("{}", token);
+    // }
 
-    let AST = parser::Parser::new(tokens, 0).parse();
+    let ast = parser::Parser::new(tokens, 0, precedence_map).parse();
+    println!("AST: {:?}", ast);
 }
