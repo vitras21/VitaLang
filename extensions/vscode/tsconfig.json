@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es6",
+    "outDir": "out",        // compiled JS goes here
+    "rootDir": "src",       // TS source files are here
+    "lib": ["es6"],
+    "sourceMap": true,
+    "strict": true,
+    "types": ["node", "vscode"]
+  },
+  "exclude": ["node_modules", ".vscode-test", "out"]
+}

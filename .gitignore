@@ -39,3 +39,11 @@
 
 # debug information files
 *.dwo
+
+
+extensions/vscode/.vscode/*
+extensions/vscode/node_modules/*
+extensions/vscode/out/*
+extensions/vscode/*.vsix
+
+VitaLang
