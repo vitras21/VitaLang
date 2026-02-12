@@ -10,7 +10,8 @@ pub enum TokenType {
     LeftParen, RightParen,
     Variable, Const, String, Comma,
     Indent, Dedent, Newline, LeftCurly, RightCurly,
-    EOF, Continue, Yield, Try, Catch
+    EOF, Continue, Yield, Try, Catch,
+    Comment, BlockCommentStart, BlockCommentEnd
 }
 
 use std::fmt;
@@ -37,7 +38,10 @@ static KEYWORDS: LazyLock<Vec<(&'static str, TokenType)>> = LazyLock::new(|| {
         ("get back to work boy", TokenType::Continue),
         ("anywho", TokenType::Yield),
         ("sir, would there happen to be any extension work?", TokenType::Try),
-        ("yay, homework!", TokenType::Catch)
+        ("yay, homework!", TokenType::Catch),
+        ("europe ->", TokenType::Comment),
+        ("asia ->", TokenType::BlockCommentStart),
+        ("<- asia", TokenType::BlockCommentEnd)
     ];
 
     v.sort_by_key(|(s, _): &(&str, TokenType)| std::cmp::Reverse(s.len()));
@@ -84,6 +88,51 @@ impl fmt::Display for Token {
 }
 
 static OPERATORS: &[&str] = &["^", "*", "/", "+", "-", "<", ">", "=", "≥", "≤"];
+
+fn consume_until_newline(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
+    let mut s = String::new();
+    while let Some(&c) = chars.peek() {
+        if c == '\n' {
+            break;
+        }
+        s.push(c);
+        chars.next();
+    }
+    s
+}
+
+fn consume_until(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, end: &str) -> String {
+    let mut s = String::new();
+
+    loop {
+        let mut it = chars.clone();
+        let mut matched = true;
+
+        for ec in end.chars() {
+            match it.next() {
+                Some(c) if c == ec => {}
+                _ => {
+                    matched = false;
+                    break;
+                }
+            }
+        }
+
+        if matched {
+            for _ in 0..end.len() {
+                chars.next();
+            }
+            break;
+        }
+
+        match chars.next() {
+            Some(c) => s.push(c),
+            None => break,
+        }
+    }
+
+    s
+}
 
 pub fn tokenize(src: &String) -> Vec<Token> {
     let mut tokens = Vec::<Token>::new();
@@ -191,24 +240,49 @@ pub fn tokenize(src: &String) -> Vec<Token> {
                             break;
                         }
                     }
-                }
-
+                };
+                
                 if let Some(token_type) = matched {
                     for _ in 0..matched_len {
                         chars.next();
                     }
-                    if token_type == TokenType::For {
-                        let mut it = 0;
-                        while let Some(&next_c) = chars.peek() {
-                            if next_c != 's' {
-                                break;
-                            }
-                            it += 1;
-                            chars.next();
+
+                    match token_type {
+                        TokenType::Comment => {
+                            let text = consume_until_newline(&mut chars);
+                            tokens.push(Token::new(
+                                TokenType::Comment,
+                                Some(TokenValue::Str(text)),
+                            ));
                         }
-                        tokens.push(Token::new(token_type, Some(TokenValue::Num(it))));
-                    } else {
-                        tokens.push(Token::new(token_type, Some(TokenValue::Str(keyword.to_string()))));
+
+                        TokenType::BlockCommentStart => {
+                            let text = consume_until(&mut chars, "<- asia");
+                            tokens.push(Token::new(
+                                TokenType::BlockCommentStart,
+                                Some(TokenValue::Str(text)),
+                            ));
+                            tokens.push(Token::new(TokenType::BlockCommentEnd, None));
+                        }
+
+                        TokenType::For => {
+                            let mut it = 0;
+                            while let Some(&next_c) = chars.peek() {
+                                if next_c != 's' {
+                                    break;
+                                }
+                                it += 1;
+                                chars.next();
+                            }
+                            tokens.push(Token::new(TokenType::For, Some(TokenValue::Num(it))));
+                        }
+
+                        _ => {
+                            tokens.push(Token::new(
+                                token_type,
+                                Some(TokenValue::Str(keyword.to_string())),
+                            ));
+                        }
                     }
                 } else {
                     let mut value = String::new();

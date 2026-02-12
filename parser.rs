@@ -108,7 +108,7 @@ impl<'a> Parser<'a> {
             match token._type {
                 lexer::TokenType::EOF => break,
 
-                lexer::TokenType::Newline => {
+                lexer::TokenType::Newline | lexer::TokenType::Comment | lexer::TokenType::BlockCommentStart | lexer::TokenType::BlockCommentEnd => {
                     self.advance();
                 }
 
