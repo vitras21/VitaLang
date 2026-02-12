@@ -1,0 +1,33 @@
+{
+  "name": "VitaLang Theme",
+  "type": "dark",
+  "colors": {},
+  "tokenColors": [
+    {
+      "scope": "keyword.control.vitalang",
+      "settings": {
+        "foreground": "#FF00FF",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": "variable.other.vitalang",
+      "settings": {
+        "foreground": "#00FFFF"
+      }
+    },
+    {
+      "scope": "string.unquoted.vitalang",
+      "settings": {
+        "foreground": "#FFA500"
+      }
+    },
+    {
+      "scope": "comment.line.vitalang, comment.block.vitalang",
+      "settings": {
+        "foreground": "#888888",
+        "fontStyle": "italic"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+    "comments": {
+        "lineComment": "europe ->",
+        "blockComment": [ "asia ->", "<- asia" ]
+    },
+    "brackets": [
+        ["{", "}"],
+        ["(", ")"]
+    ],
+    "autoClosingPairs": [
+        ["{", "}"],
+        ["(", ")"]
+    ],
+    "surroundingPairs": [
+        ["{", "}"],
+        ["(", ")"]
+    ]
+}

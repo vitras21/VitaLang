@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "VitaLang",
+  "scopeName": "source.vitalang",
+
+  "patterns": [
+    { "include": "#keywords" },
+    { "include": "#variables" },
+    { "include": "#comments" },
+    { "include": "#bareStrings" }
+  ],
+
+  "repository": {
+
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.vitalang",
+          "match": "(sweet but stout|I would love to own a plot of land in the 1800s called|and lease it to|jump of the bandwagon|get back to work boy|sir, would there happen to be any extension work\\?|yay, homework!|sweet|stout|American|owners|scammy|lolsies*|yarp')"
+        }
+      ]
+    },
+
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.vitalang",
+          "match": "[$£€][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.vitalang",
+          "begin": "europe\\s*->",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.vitalang" } },
+          "end": "$",
+          "contentName": "comment.line.vitalang"
+        },
+        {
+          "name": "comment.block.vitalang",
+          "begin": "asia\\s*->",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.vitalang" } },
+          "end": "<-\\s*asia",
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.vitalang" } },
+          "contentName": "comment.block.vitalang"
+        }
+      ]
+    },
+
+    "bareStrings": {
+      "patterns": [
+        {
+          "name": "string.unquoted.vitalang",
+          "match": "[a-zA-Z0-9_]+"
+        }
+      ]
+    }
+
+  }
+}

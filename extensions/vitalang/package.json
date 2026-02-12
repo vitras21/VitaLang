@@ -1,0 +1,25 @@
+{
+  "name": "vitalang",
+  "displayName": "VitaLang",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "vitalang",
+      "aliases": ["VitaLang", "vitalang"],
+      "extensions": [".vit"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "vitalang",
+      "scopeName": "source.vitalang",
+      "path": "./syntaxes/vitalang.tmLanguage.json"
+    }]
+  }
+}
