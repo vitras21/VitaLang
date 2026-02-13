@@ -1,11 +1,12 @@
-I would love to own a plot of land in the 1800s called $x and lease it to 1 owners europe -> YAY
+I would love to own a plot of land in the 1800s called ++ and lease it to {{return x + 1}, 1, postfix} owners
+I would love to own a plot of land in the 1800s called $x and lease it to 1, 2, 3 owners europe -> test comment
 
 asia -> 
-    Yay
+    test block comment
 <- asia
 
 lolsiessssssssss £i {
-    sweet $x = £i {
+    sweet ($x++) + i = £i {
         $x
         $x
     } stout {

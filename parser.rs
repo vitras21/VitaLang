@@ -1,12 +1,10 @@
 use crate::lexer;
-use std::collections::HashMap;
-
-const POSTFIX: &[&str] = &["!", "?", "+", "-"];
-const PREFIX: &[&str] = &["!", "?"];
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub enum Expr {
     String(String),
+    Array(Vec<String>),
     Variable(String),
     Const(String),
 
@@ -62,22 +60,54 @@ pub enum Expr {
     Block(Vec<Expr>)
 }
 
-pub struct Parser<'a> {
+pub struct Parser {
     tokens: Vec<lexer::Token>,
     pos: usize,
-    precedence_map: HashMap<&'a str, usize>,
+    precedence_map: HashMap<String, usize>,
+    prefix_ops: HashSet<String>,
+    postfix_ops: HashSet<String>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(tokens: Vec<lexer::Token>, pos: usize, precedence_map: HashMap<&'a str, usize>) -> Self {
-        Self { tokens, pos, precedence_map }
+impl Parser {
+    pub fn new(
+        tokens: Vec<lexer::Token>,
+        pos: usize,
+        precedence_map: HashMap<String, usize>,
+        operator_defs: Vec<crate::first_pass::OperatorDef>,
+    ) -> Self {
+        let mut prefix_ops: HashSet<String> =
+            ["!", "?"].iter().map(|s| s.to_string()).collect();
+        let mut postfix_ops: HashSet<String> =
+            ["!", "?"].iter().map(|s| s.to_string()).collect();
+
+        postfix_ops.insert("++".to_string());
+
+        for def in &operator_defs {
+            match def.kind {
+                crate::first_pass::OperatorKind::Prefix => {
+                    prefix_ops.insert(def.op.clone());
+                }
+                crate::first_pass::OperatorKind::Postfix => {
+                    postfix_ops.insert(def.op.clone());
+                }
+                crate::first_pass::OperatorKind::Binary => {}
+            }
+        }
+
+        Self {
+            tokens,
+            pos,
+            precedence_map,
+            prefix_ops,
+            postfix_ops,
+        }
     }
 
     fn precedence(&self, token: &lexer::Token) -> usize {
         let v = &token.value;
 
         match v {
-            Some(lexer::TokenValue::Str(s)) =>  return *self.precedence_map.get(s.as_str()).unwrap(),
+            Some(lexer::TokenValue::Str(s)) =>  return *self.precedence_map.get(s.as_str()).unwrap_or(&0),
             _ => crate::fail()
         }
     }
@@ -95,7 +125,12 @@ impl<'a> Parser<'a> {
     fn expect(&mut self, types: &[lexer::TokenType]) -> lexer::Token {
         let token = match self.advance(){ Some(t) => t, None => crate::fail(), };
         if !types.iter().any(|t| *t == token._type) {
-            crate::fail();
+            panic!(
+                "parse error at pos {}: expected one of {:?}, got {:?}",
+                self.pos.saturating_sub(1),
+                types,
+                token._type
+            );
         }
         token
     }
@@ -140,6 +175,12 @@ impl<'a> Parser<'a> {
                 break;
             }
 
+            if let Some(op) = token_op(token) {
+                if self.postfix_ops.contains(&op) {
+                    break;
+                }
+            }
+
             let prec = self.precedence(token);
             if prec < min_prec {
                 // eprintln!("[DEBUG] Precedence {} < {}, breaking", prec, min_prec);
@@ -165,9 +206,8 @@ impl<'a> Parser<'a> {
 
     fn parse_prefix(&mut self) -> Expr {
         if let Some(token) = self.peek() {
-            if let Some(lexer::TokenValue::Char(c)) = &token.value {
-                if PREFIX.contains(&c.to_string().as_str()) {
-                    let op = c.to_string();
+            if let Some(op) = token_op(token) {
+                if self.prefix_ops.contains(&op) {
                     self.advance();
                     let expr = self.parse_prefix();
                     return Expr::Unary {
@@ -191,20 +231,18 @@ impl<'a> Parser<'a> {
             };
 
             match token._type {
-                _ if matches!(
-                    token.value,
-                    Some(lexer::TokenValue::Char(c))
-                        if POSTFIX.contains(&c.to_string().as_str())
-                ) => {
-                    let op = match &token.value {
-                        Some(lexer::TokenValue::Char(c)) => c.to_string(),
-                        _ => unreachable!(),
-                    };
-                    self.advance();
-                    expr = Expr::Unary {
-                        oper: Box::new(expr),
-                        op,
-                    };
+                lexer::TokenType::BinaryOperator => {
+                    if let Some(op) = token_op(token) {
+                        if self.postfix_ops.contains(&op) {
+                            self.advance();
+                            expr = Expr::Unary {
+                                oper: Box::new(expr),
+                                op,
+                            };
+                            continue;
+                        }
+                    }
+                    break;
                 }
 
                 lexer::TokenType::While => {
@@ -268,6 +306,21 @@ impl<'a> Parser<'a> {
                             name: s,
                             args,
                         }
+                    },
+                    Some(lexer::Token {_type: lexer::TokenType::Comma, .. }) => {
+                        // eprintln!("[DEBUG] Decided string was part of array");
+                        let mut array = Vec::<String>::new();
+                        array.push(s);
+                        while self.peek().unwrap()._type == lexer::TokenType::Comma {
+                            self.expect(&[lexer::TokenType::Comma]);
+                            match self.advance() {
+                                Some(lexer:: Token {_type: lexer::TokenType::String, value: Some(lexer::TokenValue::Str(v))}) => {
+                                    array.push(v);
+                                },
+                                _ => crate::fail()
+                            }
+                        }
+                        Expr::Array(array)
                     },
                     _ => Expr::String(s)
                 }
@@ -340,7 +393,13 @@ impl<'a> Parser<'a> {
                 Expr::Define {var, val: Box::new(val) }
             },
 
-            _ => crate::fail(),
+            Some(tok) => panic!(
+                "unexpected token {:?} at pos {} with value {:?}",
+                tok._type,
+                self.pos - 1,
+                tok.value
+            ),
+            None => crate::fail(),
         }
     }
 
@@ -461,5 +520,15 @@ impl<'a> Parser<'a> {
         // eprintln!("[DEBUG] parse_yield with {}", self.tokens.get(self.pos).unwrap());
         let expr = self.parse_expr();
         Expr::Yield(Box::new(expr))
+    }
+}
+
+fn token_op(token: &lexer::Token) -> Option<String> {
+    match (&token._type, &token.value) {
+        (lexer::TokenType::BinaryOperator, Some(lexer::TokenValue::Str(s))) => Some(s.clone()),
+        (lexer::TokenType::BinaryOperator, Some(lexer::TokenValue::Char(c))) => {
+            Some(c.to_string())
+        }
+        _ => None,
     }
 }
